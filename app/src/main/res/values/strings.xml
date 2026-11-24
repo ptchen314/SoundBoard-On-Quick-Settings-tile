@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">音效快捷磚</string>
+    <string name="tile_default_label_1">音效 1</string>
+    <string name="tile_default_label_2">音效 2</string>
+    <string name="tile_default_label_3">音效 3</string>
+    <string name="tile_default_label_4">音效 4</string>
+    <string name="tile_default_label_5">音效 5</string>
+</resources>

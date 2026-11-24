@@ -36,8 +36,10 @@
             </intent-filter>
         </activity>
 
+        <!-- 共 20 個磚位；實際啟用幾個由 App 內「磚位數量」決定（PackageManager 開關元件） -->
         <service
             android:name=".tile.SoundTile1"
+            android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_tile"
             android:label="@string/tile_default_label_1"
@@ -49,6 +51,7 @@
 
         <service
             android:name=".tile.SoundTile2"
+            android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_tile"
             android:label="@string/tile_default_label_2"
@@ -60,6 +63,7 @@
 
         <service
             android:name=".tile.SoundTile3"
+            android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_tile"
             android:label="@string/tile_default_label_3"
@@ -71,6 +75,7 @@
 
         <service
             android:name=".tile.SoundTile4"
+            android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_tile"
             android:label="@string/tile_default_label_4"
@@ -82,9 +87,190 @@
 
         <service
             android:name=".tile.SoundTile5"
+            android:enabled="true"
             android:exported="true"
             android:icon="@drawable/ic_tile"
             android:label="@string/tile_default_label_5"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile6"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_6"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile7"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_7"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile8"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_8"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile9"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_9"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile10"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_10"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile11"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_11"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile12"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_12"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile13"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_13"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile14"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_14"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile15"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_15"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile16"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_16"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile17"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_17"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile18"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_18"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile19"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_19"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".tile.SoundTile20"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_tile"
+            android:label="@string/tile_default_label_20"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />

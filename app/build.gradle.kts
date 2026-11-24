@@ -1,8 +1,32 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
+// ---- 自動滾版本號 ----
+val versionFile = rootProject.file("version.properties")
+val versionProps = Properties().apply { versionFile.inputStream().use { load(it) } }
+val versionMajor = versionProps.getProperty("major", "1").toInt()
+val versionMinor = versionProps.getProperty("minor", "0").toInt()
+var buildNumber = versionProps.getProperty("build", "0").toInt()
+
+// 只有真的要打包時才加 1（Android Studio 同步、lint、test 不會動到版本號）
+val isPackaging = gradle.startParameter.taskNames.any { task ->
+    val name = task.substringAfterLast(':')
+    listOf("assemble", "bundle", "install", "package").any { name.startsWith(it, ignoreCase = true) }
+}
+if (isPackaging) {
+    buildNumber += 1
+    // 直接改寫數字那一行，保留檔案的註解和排版
+    versionFile.writeText(
+        versionFile.readText().replace(Regex("(?m)^build=.*$"), "build=$buildNumber")
+    )
+}
+val appVersionName = "$versionMajor.$versionMinor.${"%02d".format(buildNumber)}"
+logger.lifecycle("SoundBoardTile version $appVersionName (code ${buildNumber.coerceAtLeast(1)})")
 
 android {
     namespace = "com.soundboard.qstile"
@@ -12,8 +36,8 @@ android {
         applicationId = "com.soundboard.qstile"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = buildNumber.coerceAtLeast(1)
+        versionName = appVersionName
     }
 
     buildTypes {
@@ -30,6 +54,14 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+    }
+    // APK 檔名帶版本號，例如 SoundBoardTile-1.0.01-debug.apk
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "SoundBoardTile-${variant.versionName}-${variant.buildType.name}.apk"
+        }
     }
     buildFeatures {
         compose = true

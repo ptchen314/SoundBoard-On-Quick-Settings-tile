@@ -76,6 +76,7 @@ fun SoundBoardScreen(sharedUrl: String? = null, onSharedUrlConsumed: () -> Unit 
     val context = LocalContext.current
     val sounds by SoundRepository.sounds.collectAsStateWithLifecycle()
     val slots by SoundRepository.slots.collectAsStateWithLifecycle()
+    val slotCount by SoundRepository.slotCount.collectAsStateWithLifecycle()
     val playingId by SoundPlayer.playingId.collectAsStateWithLifecycle()
 
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
@@ -129,7 +130,8 @@ fun SoundBoardScreen(sharedUrl: String? = null, onSharedUrlConsumed: () -> Unit 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            items((1..SoundRepository.SLOT_COUNT).toList()) { slot ->
+            item { SlotCountControl(slotCount) }
+            items((1..slotCount).toList(), key = { "slot$it" }) { slot ->
                 SlotCard(
                     slot = slot,
                     assigned = SoundRepository.find(slots[slot]),
@@ -154,7 +156,7 @@ fun SoundBoardScreen(sharedUrl: String? = null, onSharedUrlConsumed: () -> Unit 
                 SoundRow(
                     sound = sound,
                     playing = playingId == sound.id,
-                    slotsUsing = slots.filterValues { it == sound.id }.keys.sorted(),
+                    slotsUsing = slots.filterKeys { it <= slotCount }.filterValues { it == sound.id }.keys.sorted(),
                     onPlay = {
                         if (!SoundPlayer.toggle(sound) && playingId != sound.id) {
                             Toast.makeText(context, "無法播放這個檔案", Toast.LENGTH_SHORT).show()
@@ -182,7 +184,7 @@ fun SoundBoardScreen(sharedUrl: String? = null, onSharedUrlConsumed: () -> Unit 
                     Toast.makeText(context, "匯入失敗", Toast.LENGTH_SHORT).show()
                 } else {
                     // 自動放到第一個空的磚位
-                    val freeSlot = (1..SoundRepository.SLOT_COUNT).firstOrNull { it !in SoundRepository.slots.value }
+                    val freeSlot = SoundRepository.firstFreeSlot()
                     if (freeSlot != null) {
                         SoundRepository.assignSlot(freeSlot, sound.id)
                         Toast.makeText(context, "已指定到磚位 $freeSlot", Toast.LENGTH_SHORT).show()
@@ -286,7 +288,7 @@ private fun PlaybackSettingsCard() {
                 }
                 Spacer(Modifier.width(12.dp))
                 Switch(checked = ignoreMute, onCheckedChange = {
-                    SoundPlayer.stop()
+                    SoundPlayer.releaseAll() // 換音訊通道，要重建播放器
                     SoundRepository.setIgnoreMediaMute(it)
                 })
             }
@@ -371,6 +373,49 @@ private fun BatteryOptimizationHint() {
                     Text("前往${vendor}自啟動設定")
                 }
             }
+        }
+    }
+}
+
+/** 磚位數量：1..20，停用的磚不會出現在快速設定的編輯清單。 */
+@Composable
+private fun SlotCountControl(count: Int) {
+    val context = LocalContext.current
+    var pending by remember(count) { mutableFloatStateOf(count.toFloat()) }
+    fun commit(n: Int) {
+        val c = n.coerceIn(1, SoundRepository.MAX_SLOTS)
+        if (c == SoundRepository.slotCount.value) return
+        SoundRepository.setSlotCount(c)
+        SoundTileService.applyEnabledSlots(context, c)
+    }
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "磚位數量 ${pending.toInt()} / ${SoundRepository.MAX_SLOTS}",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedIconButton(onClick = { commit(count - 1) }, enabled = count > 1) {
+                    Icon(Icons.Default.Remove, "減少磚位")
+                }
+                Spacer(Modifier.width(8.dp))
+                OutlinedIconButton(onClick = { commit(count + 1) }, enabled = count < SoundRepository.MAX_SLOTS) {
+                    Icon(Icons.Default.Add, "增加磚位")
+                }
+            }
+            Slider(
+                value = pending,
+                onValueChange = { pending = it },
+                onValueChangeFinished = { commit(pending.toInt()) },
+                valueRange = 1f..SoundRepository.MAX_SLOTS.toFloat(),
+                steps = SoundRepository.MAX_SLOTS - 2,
+            )
+            Text(
+                "用不到的磚位會被隱藏，不會出現在快速設定的編輯清單。減少後，已加到快速設定的那幾格會被系統移除，指定的音效會保留，調回來就恢復。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

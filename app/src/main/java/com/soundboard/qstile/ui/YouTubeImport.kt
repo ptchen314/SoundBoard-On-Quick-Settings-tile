@@ -95,7 +95,7 @@ fun YouTubeImportDialog(
                     sound = SoundRepository.addFromFile(info.title, out)
                     editable = info.durationSec * 1000 <= AudioEdit.MAX_DURATION_MS
                 }
-                val freeSlot = (1..SoundRepository.SLOT_COUNT).firstOrNull { it !in SoundRepository.slots.value }
+                val freeSlot = SoundRepository.firstFreeSlot()
                 if (freeSlot != null) SoundRepository.assignSlot(freeSlot, sound.id)
                 step = Step.Idle
                 onDone(sound, editable)

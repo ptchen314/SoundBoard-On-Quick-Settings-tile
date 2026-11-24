@@ -23,7 +23,9 @@ data class Sound(
  * 音效檔會複製到 App 內部儲存空間，所以原始檔被刪除或移動也不影響播放。
  */
 object SoundRepository {
-    const val SLOT_COUNT = 5
+    /** 預先宣告的磚位總數（Manifest 裡的 SoundTile1..20） */
+    const val MAX_SLOTS = 20
+    const val DEFAULT_SLOTS = 5
 
     private const val PREFS = "soundboard"
     private const val KEY_SOUNDS = "sounds"
@@ -36,7 +38,7 @@ object SoundRepository {
     private val _sounds = MutableStateFlow<List<Sound>>(emptyList())
     val sounds: StateFlow<List<Sound>> = _sounds.asStateFlow()
 
-    /** 磚位編號 (1..SLOT_COUNT) -> 音效 id */
+    /** 磚位編號 (1..MAX_SLOTS) -> 音效 id */
     private val _slots = MutableStateFlow<Map<Int, String>>(emptyMap())
     val slots: StateFlow<Map<Int, String>> = _slots.asStateFlow()
 
@@ -46,6 +48,19 @@ object SoundRepository {
     private val _ignoreMediaMute = MutableStateFlow(false)
     /** 開啟時改用鬧鐘音訊通道播放，媒體音量為 0 或靜音模式時也聽得到。 */
     val ignoreMediaMute: StateFlow<Boolean> = _ignoreMediaMute.asStateFlow()
+
+    private const val KEY_SLOT_COUNT = "slot_count"
+    private val _slotCount = MutableStateFlow(DEFAULT_SLOTS)
+    /** 啟用的磚位數量（1..MAX_SLOTS）。超出範圍的磚位指定會保留，調回來就恢復。 */
+    val slotCount: StateFlow<Int> = _slotCount.asStateFlow()
+
+    fun setSlotCount(count: Int) {
+        _slotCount.value = count.coerceIn(1, MAX_SLOTS)
+        prefs.edit().putInt(KEY_SLOT_COUNT, _slotCount.value).apply()
+    }
+
+    /** 第一個還沒指定音效的啟用中磚位。 */
+    fun firstFreeSlot(): Int? = (1.._slotCount.value).firstOrNull { it !in _slots.value }
 
     private const val KEY_KEEP_ALIVE = "keep_alive"
     private val _keepAlive = MutableStateFlow(false)
@@ -137,6 +152,7 @@ object SoundRepository {
     }
 
     fun delete(id: String) {
+        SoundPlayer.forget(id)
         find(id)?.let { fileOf(it).delete() }
         _sounds.value = _sounds.value.filterNot { it.id == id }
         _slots.value = _slots.value.filterValues { it != id }
@@ -159,12 +175,13 @@ object SoundRepository {
         _ignoreMediaMute.value = prefs.getBoolean(KEY_IGNORE_MEDIA_MUTE, false)
         _playbackVolume.value = prefs.getFloat(KEY_PLAYBACK_VOLUME, 1f)
         _keepAlive.value = prefs.getBoolean(KEY_KEEP_ALIVE, false)
+        _slotCount.value = prefs.getInt(KEY_SLOT_COUNT, DEFAULT_SLOTS).coerceIn(1, MAX_SLOTS)
         val arr = JSONArray(prefs.getString(KEY_SOUNDS, "[]"))
         _sounds.value = (0 until arr.length()).map {
             val o = arr.getJSONObject(it)
             Sound(o.getString("id"), o.getString("name"), o.getString("file"))
         }
-        _slots.value = (1..SLOT_COUNT).mapNotNull { slot ->
+        _slots.value = (1..MAX_SLOTS).mapNotNull { slot ->
             prefs.getString(KEY_SLOT_PREFIX + slot, null)?.let { slot to it }
         }.toMap()
     }
@@ -176,7 +193,7 @@ object SoundRepository {
         }
         prefs.edit().apply {
             putString(KEY_SOUNDS, arr.toString())
-            for (slot in 1..SLOT_COUNT) {
+            for (slot in 1..MAX_SLOTS) {
                 val v = _slots.value[slot]
                 if (v == null) remove(KEY_SLOT_PREFIX + slot) else putString(KEY_SLOT_PREFIX + slot, v)
             }

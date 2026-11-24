@@ -58,8 +58,11 @@ object AudioEdit {
 
     class TooLongException : Exception()
 
-    /** 把任何 Android 支援的音訊檔解碼成 PCM。 */
-    fun decode(file: File): DecodedAudio {
+    /**
+     * 把任何 Android 支援的音訊檔解碼成 PCM。
+     * 可指定 fromMs/toMs 只解碼其中一段（用來從長影片截取片段）。
+     */
+    fun decode(file: File, fromMs: Long = 0, toMs: Long? = null): DecodedAudio {
         val extractor = MediaExtractor()
         extractor.setDataSource(file.absolutePath)
         val track = (0 until extractor.trackCount).firstOrNull {
@@ -68,7 +71,10 @@ object AudioEdit {
         extractor.selectTrack(track)
         val format = extractor.getTrackFormat(track)
         val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
-        if (durationUs / 1000 > MAX_DURATION_MS) {
+        val fromUs = fromMs.coerceAtLeast(0) * 1000
+        val toUs = toMs?.let { it * 1000 } ?: Long.MAX_VALUE
+        val windowUs = min(durationUs, toUs) - fromUs
+        if (windowUs / 1000 > MAX_DURATION_MS) {
             extractor.release()
             throw TooLongException()
         }
@@ -79,8 +85,9 @@ object AudioEdit {
         val codec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
         codec.configure(format, null, null, 0)
         codec.start()
+        if (fromUs > 0) extractor.seekTo(fromUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
-        var buf = ShortArray(max(1L, durationUs * sampleRate / 1_000_000L * channels + sampleRate * channels).toInt())
+        var buf = ShortArray(max(1L, windowUs.coerceAtLeast(0) * sampleRate / 1_000_000L * channels + sampleRate * channels).toInt())
         var size = 0
         val info = MediaCodec.BufferInfo()
         var inputDone = false
@@ -92,7 +99,7 @@ object AudioEdit {
                     if (inIdx >= 0) {
                         val ib = codec.getInputBuffer(inIdx)!!
                         val n = extractor.readSampleData(ib, 0)
-                        if (n < 0) {
+                        if (n < 0 || extractor.sampleTime > toUs) {
                             codec.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
                             inputDone = true
                         } else {
@@ -108,19 +115,31 @@ object AudioEdit {
                         ob.position(info.offset)
                         ob.limit(info.offset + info.size)
                         ob.order(ByteOrder.LITTLE_ENDIAN)
-                        val count = if (isFloat) info.size / 4 else info.size / 2
-                        if (size + count > buf.size) buf = buf.copyOf(max(buf.size * 2, size + count))
-                        if (isFloat) {
-                            val fb = ob.asFloatBuffer()
-                            for (i in 0 until count) {
-                                buf[size + i] = (fb.get(i).coerceIn(-1f, 1f) * 32767f).roundToInt().toShort()
+                        val total = if (isFloat) info.size / 4 else info.size / 2
+                        val bufFrames = total / channels
+                        // 只保留 [fromUs, toUs) 內的 frame
+                        val pts = info.presentationTimeUs
+                        val skip = if (pts < fromUs) ((fromUs - pts) * sampleRate / 1_000_000L).toInt().coerceIn(0, bufFrames) else 0
+                        val keepEnd = if (toUs == Long.MAX_VALUE) bufFrames
+                            else ((toUs - pts) * sampleRate / 1_000_000L).toInt().coerceIn(0, bufFrames)
+                        val keep = (keepEnd - skip).coerceAtLeast(0) * channels
+                        val offset = skip * channels
+                        if (size + keep > buf.size) buf = buf.copyOf(max(buf.size * 2, size + keep))
+                        if (keep > 0) {
+                            if (isFloat) {
+                                val fb = ob.asFloatBuffer()
+                                for (i in 0 until keep) {
+                                    buf[size + i] = (fb.get(offset + i).coerceIn(-1f, 1f) * 32767f).roundToInt().toShort()
+                                }
+                            } else {
+                                val sb = ob.asShortBuffer()
+                                sb.position(offset)
+                                sb.get(buf, size, keep)
                             }
-                        } else {
-                            ob.asShortBuffer().get(buf, size, count)
                         }
-                        size += count
+                        size += keep
                         codec.releaseOutputBuffer(outIdx, false)
-                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
+                        if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0 || keepEnd < bufFrames) outputDone = true
                     }
                     outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val of = codec.outputFormat

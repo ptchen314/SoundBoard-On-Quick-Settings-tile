@@ -88,6 +88,7 @@ abstract class SoundTileService(private val slot: Int) : TileService() {
     }
 
     @Suppress("DEPRECATION")
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated") // 已依 SDK 版本分流
     private fun openApp() {
         val intent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

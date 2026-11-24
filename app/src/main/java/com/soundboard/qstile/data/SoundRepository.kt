@@ -47,6 +47,16 @@ object SoundRepository {
     /** 開啟時改用鬧鐘音訊通道播放，媒體音量為 0 或靜音模式時也聽得到。 */
     val ignoreMediaMute: StateFlow<Boolean> = _ignoreMediaMute.asStateFlow()
 
+    private const val KEY_KEEP_ALIVE = "keep_alive"
+    private val _keepAlive = MutableStateFlow(false)
+    /** 是否以前景服務常駐背景。 */
+    val keepAlive: StateFlow<Boolean> = _keepAlive.asStateFlow()
+
+    fun setKeepAlive(enabled: Boolean) {
+        _keepAlive.value = enabled
+        prefs.edit().putBoolean(KEY_KEEP_ALIVE, enabled).apply()
+    }
+
     private const val KEY_PLAYBACK_VOLUME = "playback_volume"
     private val _playbackVolume = MutableStateFlow(1f)
     /** App 內的播放音量比例（0..1），用 MediaPlayer.setVolume 套用，不改系統音量。 */
@@ -148,6 +158,7 @@ object SoundRepository {
     private fun load() {
         _ignoreMediaMute.value = prefs.getBoolean(KEY_IGNORE_MEDIA_MUTE, false)
         _playbackVolume.value = prefs.getFloat(KEY_PLAYBACK_VOLUME, 1f)
+        _keepAlive.value = prefs.getBoolean(KEY_KEEP_ALIVE, false)
         val arr = JSONArray(prefs.getString(KEY_SOUNDS, "[]"))
         _sounds.value = (0 until arr.length()).map {
             val o = arr.getJSONObject(it)

@@ -30,10 +30,29 @@ import com.soundboard.qstile.data.SoundPlayer
 import com.soundboard.qstile.data.SoundRepository
 import com.soundboard.qstile.tile.SoundTileService
 import com.soundboard.qstile.ui.TrimEditorDialog
+import com.soundboard.qstile.service.KeepAliveService
+import com.soundboard.qstile.service.PowerSettings
+import com.soundboard.qstile.ui.YouTubeImportDialog
+import com.soundboard.qstile.data.YouTubeAudio
 
 class MainActivity : ComponentActivity() {
+    /** 從 YouTube App 分享過來的網址 */
+    private var sharedUrl by mutableStateOf<String?>(null)
+
+    private fun handleShare(intent: android.content.Intent?) {
+        if (intent?.action == android.content.Intent.ACTION_SEND) {
+            YouTubeAudio.extractUrl(intent.getStringExtra(android.content.Intent.EXTRA_TEXT))?.let { sharedUrl = it }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        handleShare(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) handleShare(intent)
         enableEdgeToEdge()
         setContent {
             val dark = isSystemInDarkTheme()
@@ -44,14 +63,16 @@ class MainActivity : ComponentActivity() {
                 dark -> darkColorScheme()
                 else -> lightColorScheme()
             }
-            MaterialTheme(colorScheme = scheme) { SoundBoardScreen() }
+            MaterialTheme(colorScheme = scheme) {
+                SoundBoardScreen(sharedUrl = sharedUrl, onSharedUrlConsumed = { sharedUrl = null })
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SoundBoardScreen() {
+fun SoundBoardScreen(sharedUrl: String? = null, onSharedUrlConsumed: () -> Unit = {}) {
     val context = LocalContext.current
     val sounds by SoundRepository.sounds.collectAsStateWithLifecycle()
     val slots by SoundRepository.slots.collectAsStateWithLifecycle()
@@ -61,6 +82,16 @@ fun SoundBoardScreen() {
     var renaming by remember { mutableStateOf<Sound?>(null) }
     var deleting by remember { mutableStateOf<Sound?>(null) }
     var editing by remember { mutableStateOf<Sound?>(null) }
+    var youtubeOpen by remember { mutableStateOf(false) }
+    var youtubeUrl by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(sharedUrl) {
+        if (sharedUrl != null) {
+            youtubeUrl = sharedUrl
+            youtubeOpen = true
+            onSharedUrlConsumed()
+        }
+    }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) pendingUri = uri
@@ -69,16 +100,24 @@ fun SoundBoardScreen() {
     Scaffold(
         topBar = { TopAppBar(title = { Text("音效快捷磚") }) },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { picker.launch(arrayOf("audio/*")) },
-                icon = { Icon(Icons.Default.Add, null) },
-                text = { Text("新增音效") },
-            )
+            Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ExtendedFloatingActionButton(
+                    onClick = { youtubeUrl = null; youtubeOpen = true },
+                    icon = { Icon(Icons.Default.Download, null) },
+                    text = { Text("YouTube") },
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                )
+                ExtendedFloatingActionButton(
+                    onClick = { picker.launch(arrayOf("audio/*")) },
+                    icon = { Icon(Icons.Default.Add, null) },
+                    text = { Text("新增音效") },
+                )
+            }
         },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 170.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item { PlaybackSettingsCard() }
@@ -163,6 +202,18 @@ fun SoundBoardScreen() {
         )
     }
 
+    if (youtubeOpen) {
+        YouTubeImportDialog(
+            initialUrl = youtubeUrl,
+            onDismiss = { youtubeOpen = false },
+            onDone = { sound, editable ->
+                youtubeOpen = false
+                Toast.makeText(context, "已新增「${sound.name}」", Toast.LENGTH_SHORT).show()
+                if (editable) editing = sound
+            },
+        )
+    }
+
     editing?.let { sound ->
         TrimEditorDialog(sound = sound, onDismiss = { editing = null })
     }
@@ -188,9 +239,42 @@ fun SoundBoardScreen() {
 private fun PlaybackSettingsCard() {
     val ignoreMute by SoundRepository.ignoreMediaMute.collectAsStateWithLifecycle()
     val volume by SoundRepository.playbackVolume.collectAsStateWithLifecycle()
+    val keepAlive by SoundRepository.keepAlive.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    // Android 13+ 要通知權限，常駐通知才會顯示（不給也能常駐，只是看不到通知）
+    val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        KeepAliveService.startIfEnabled(context)
+    }
 
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("常駐背景", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "在通知列放一則常駐通知，讓系統不會把 App 凍結或關掉，快速設定磚反應更快、播放狀態更準。開機後會自動啟動。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = keepAlive, onCheckedChange = { on ->
+                    SoundRepository.setKeepAlive(on)
+                    if (!on) {
+                        KeepAliveService.stop(context)
+                    } else if (Build.VERSION.SDK_INT >= 33 &&
+                        androidx.core.content.ContextCompat.checkSelfPermission(
+                            context, android.Manifest.permission.POST_NOTIFICATIONS,
+                        ) != android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        KeepAliveService.startIfEnabled(context)
+                    }
+                })
+            }
+            if (keepAlive) BatteryOptimizationHint()
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("忽略媒體靜音", style = MaterialTheme.typography.titleSmall)
@@ -223,6 +307,70 @@ private fun PlaybackSettingsCard() {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+    }
+}
+
+/** 常駐背景開啟時，若仍受電池最佳化限制，提示並提供跳轉。 */
+@Composable
+private fun BatteryOptimizationHint() {
+    val context = LocalContext.current
+    var ignoring by remember { mutableStateOf(PowerSettings.isIgnoringBatteryOptimizations(context)) }
+    // 從設定頁回來時重新檢查
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                ignoring = PowerSettings.isIgnoringBatteryOptimizations(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+    val vendor = remember { PowerSettings.vendorName() }
+
+    Spacer(Modifier.height(8.dp))
+    Surface(
+        color = if (ignoring) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (!ignoring) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BatteryAlert, null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "系統的電池最佳化仍可能把 App 關掉",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                    )
+                }
+                Text(
+                    "建議把本 App 設為「不限制電池用量」，常駐才會穩定。按下按鈕後由你在系統視窗確認。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Button(onClick = { PowerSettings.requestIgnoreBatteryOptimizations(context) }) {
+                    Text("前往設定不限制電池")
+                }
+            } else {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.BatteryFull, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("已設為不限制電池用量", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+            if (vendor != null) {
+                Text(
+                    "${vendor}手機另有「自啟動／背景管理」，也建議允許本 App，否則開機後可能無法自動常駐。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (ignoring) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onErrorContainer,
+                )
+                OutlinedButton(onClick = { PowerSettings.openVendorAutoStart(context) }) {
+                    Text("前往${vendor}自啟動設定")
+                }
+            }
         }
     }
 }

@@ -12,6 +12,12 @@
 - 剪輯音效：裁切起訖點、調整音量、淡入淡出，可試聽，存成 WAV（覆蓋或另存新音效）
 - 「忽略媒體靜音」開關：改走鬧鐘音訊通道，媒體音量為 0 或靜音模式也聽得到；不會更改任何系統設定
 - App 內播放音量（只影響本 App）
+- 從 YouTube 下載音訊：貼上網址，或在 YouTube App 按「分享」選本 App；可指定開始/結束時間只截取一段
+
+## 第三方元件
+YouTube 解析使用 [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor)（GPL-3.0-or-later）。
+YouTube 改版時若下載失敗，通常把 `app/build.gradle.kts` 裡的 NewPipeExtractor 版本更新到最新即可。
+請只下載你有權使用的內容。
 
 ## 建置
 需求：JDK 17+、Android SDK（platform 35）。

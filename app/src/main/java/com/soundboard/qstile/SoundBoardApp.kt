@@ -1,6 +1,7 @@
 package com.soundboard.qstile
 
 import android.app.Application
+import com.soundboard.qstile.data.SoundPlayer
 import com.soundboard.qstile.data.SoundRepository
 import com.soundboard.qstile.service.KeepAliveService
 import com.soundboard.qstile.tile.SoundTileService
@@ -10,7 +11,12 @@ class SoundBoardApp : Application() {
         super.onCreate()
         SoundRepository.init(this)
         // 音效名稱或磚位指定改變時，嘗試通知磚更新（打開快速設定時也會自動重算）
-        SoundRepository.addChangeListener { SoundTileService.requestRefreshAll(this) }
+        SoundRepository.addChangeListener {
+            SoundTileService.requestRefreshAll(this)
+            SoundPlayer.preloadSlots() // 磚位或音效變了，預先解碼新的音效
+        }
+        // 先把磚位音效解碼好，第一次按就能低延遲播放
+        SoundPlayer.preloadSlots()
         // 依「磚位數量」同步啟用的磚（重新安裝或更新後 Manifest 預設值可能不同）
         SoundTileService.applyEnabledSlots(this, SoundRepository.slotCount.value)
         // 有開「常駐背景」就啟動服務（程序被系統重啟時也會走到這裡）

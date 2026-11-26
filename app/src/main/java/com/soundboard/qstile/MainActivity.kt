@@ -277,6 +277,8 @@ private fun PlaybackSettingsCard() {
             }
             if (keepAlive) BatteryOptimizationHint()
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
+            LatencyInfo()
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("忽略媒體靜音", style = MaterialTheme.typography.titleSmall)
@@ -417,6 +419,22 @@ private fun SlotCountControl(count: Int) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** 診斷：上次從「App 收到點擊」到「實際出聲」花了多久。 */
+@Composable
+private fun LatencyInfo() {
+    val latency by SoundPlayer.lastLatency.collectAsStateWithLifecycle()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            latency?.let { "上次觸發（${it.source}）：收到點擊 → 出聲 ${it.ms} ms，${it.engine}" }
+                ?: "上次觸發延遲：尚未量測（按一次磚或播放鍵）",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

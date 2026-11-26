@@ -54,6 +54,7 @@ abstract class SoundTileService(private val slot: Int) : TileService() {
     }
 
     override fun onClick() {
+        val clickNanos = android.os.SystemClock.elapsedRealtimeNanos()
         super.onClick()
         val sound = SoundRepository.soundForSlot(slot)
         if (sound == null) {
@@ -62,7 +63,7 @@ abstract class SoundTileService(private val slot: Int) : TileService() {
             return
         }
         // 一律從頭播放：連按就連續重播，不會被當成「停止」
-        SoundPlayer.play(sound)
+        SoundPlayer.play(sound, source = "磚", clickNanos = clickNanos)
         refresh()
     }
 
